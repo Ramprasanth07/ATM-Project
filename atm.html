@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Python ATM</title>
+<style>
+  :root{
+    --bg:#0A1128;
+    --panel:#12193A;
+    --panel2:#0D1430;
+    --panel3:#1B2450;
+    --screen:#071018;
+    --teal:#17E9C0;
+    --pink:#FF4D8D;
+    --gold:#FFC857;
+    --ink:#EAF0FF;
+    --muted:#7C8AB5;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:linear-gradient(160deg,var(--bg),#060a1a);
+    font-family:'Segoe UI',system-ui,sans-serif;
+    color:var(--ink);
+  }
+  .mono{font-family:'Consolas','Courier New',monospace;}
+
+  .machine{
+    width:100%;
+    max-width:420px;
+    border-radius:28px;
+    padding:26px 22px;
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    box-shadow:0 30px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04);
+    border:1px solid #1E2A55;
+  }
+  .fascia{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:16px;
+    font-size:12px;
+    letter-spacing:.2em;
+    color:var(--muted);
+  }
+  .fascia .status{display:flex;align-items:center;gap:6px;}
+  .dot-online{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 6px var(--teal);}
+
+  .screen{
+    position:relative;
+    border-radius:14px;
+    padding:24px 20px;
+    margin-bottom:20px;
+    min-height:300px;
+    background:radial-gradient(120% 140% at 50% -10%, #0d1a2f 0%, var(--screen) 60%);
+    border:1px solid rgba(23,233,192,0.25);
+    box-shadow:0 0 0 1px #000 inset, 0 0 40px rgba(23,233,192,0.12);
+    overflow:hidden;
+  }
+  .scanlines{
+    position:absolute;inset:0;
+    pointer-events:none;
+    opacity:.06;
+    background-image:repeating-linear-gradient(0deg,#fff 0px,#fff 1px,transparent 1px,transparent 3px);
+  }
+  .status-line{
+    position:relative;
+    font-size:13px;
+    margin-bottom:16px;
+    min-height:32px;
+    transition:color .2s;
+  }
+  .cursor{animation:blink 1s step-start infinite;}
+  @keyframes blink{50%{opacity:0;}}
+  @keyframes shake{
+    10%,90%{transform:translateX(-1px)}
+    20%,80%{transform:translateX(2px)}
+    30%,50%,70%{transform:translateX(-4px)}
+    40%,60%{transform:translateX(4px)}
+  }
+  .shake{animation:shake .4s;}
+  @keyframes slideIn{from{opacity:0;transform:translateY(-16px);} to{opacity:1;transform:translateY(0);}}
+
+  .dots{display:flex;gap:12px;justify-content:center;margin:16px 0;}
+  .pindot{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted);transition:all .15s;}
+  .pindot.filled{background:var(--teal);border-color:var(--teal);box-shadow:0 0 10px var(--teal);}
+  .pindot.filled.pink{background:var(--pink);border-color:var(--pink);box-shadow:0 0 10px var(--pink);}
+
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:260px;margin:0 auto;}
+  .key{
+    height:48px;border-radius:10px;font-weight:700;font-size:17px;
+    background:var(--panel2);color:var(--ink);border:1px solid rgba(23,233,192,0.2);
+    cursor:pointer;transition:transform .1s;
+  }
+  .key:active{transform:scale(0.95);}
+  .key.clear{background:var(--panel3);color:var(--pink);}
+  .key.back{background:var(--panel3);color:var(--gold);}
+
+  .menu-btn{
+    display:flex;align-items:center;gap:12px;width:100%;
+    border-radius:12px;padding:14px;margin-bottom:10px;
+    background:var(--panel2);border:1px solid rgba(23,233,192,0.2);
+    cursor:pointer;text-align:left;transition:transform .15s;
+    color:var(--ink);
+  }
+  .menu-btn:hover{transform:translateY(-2px);}
+  .menu-icon{
+    width:40px;height:40px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;flex-shrink:0;
+  }
+  .menu-text{flex:1;}
+  .menu-text .title{font-weight:600;font-size:14px;}
+  .menu-text .sub{font-size:11px;color:var(--muted);}
+  .menu-glow{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+  .back-bar{
+    background:none;border:none;color:var(--muted);
+    font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    cursor:pointer;margin-bottom:14px;display:flex;align-items:center;gap:4px;
+    padding:0;
+  }
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:12px;}
+  .chip{
+    padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;
+    background:rgba(255,200,87,0.13);color:var(--gold);border:1px solid rgba(255,200,87,0.4);
+    cursor:pointer;
+  }
+
+  .amount-display{
+    text-align:center;font-size:28px;font-weight:700;margin-bottom:12px;
+  }
+
+  .action-btn{
+    width:100%;padding:12px;border-radius:10px;font-weight:700;font-size:14px;
+    border:none;cursor:pointer;margin-top:10px;
+  }
+
+  .balance-box{text-align:center;padding:24px 0;}
+  .balance-label{font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:8px;}
+  .balance-value{font-size:38px;font-weight:800;color:var(--teal);text-shadow:0 0 24px rgba(23,233,192,0.35);}
+
+  .tx-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;padding-right:4px;}
+  .tx-item{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:12px;padding:10px 12px;border-radius:10px;background:var(--panel2);
+  }
+
+  .footer-note{text-align:center;font-size:10px;color:var(--muted);margin-top:4px;}
+
+  /* Receipt modal */
+  .overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding-top:60px;z-index:50;
+  }
+  .hidden{display:none !important;}
+  .slip{
+    width:100%;max-width:280px;animation:slideIn .4s ease-out;
+  }
+  .slip-paper{
+    position:relative;background:#F4F1EA;color:#0A1128;padding:20px 16px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  }
+  .slip-title{text-align:center;font-weight:700;letter-spacing:.2em;margin-bottom:4px;font-size:13px;}
+  .slip-sub{text-align:center;font-size:10px;color:#7C8AB5;margin-bottom:10px;}
+  .slip-line{display:flex;justify-content:space-between;font-size:12px;padding:2px 0;}
+  .slip-divider{border-top:1px dashed rgba(0,0,0,0.3);margin:8px 0;}
+  .slip-approved{text-align:center;font-size:10px;font-weight:700;color:#178A6E;}
+  .slip-btn{
+    width:100%;margin-top:14px;padding:10px;border-radius:10px;border:none;
+    background:var(--teal);color:#04211c;font-weight:700;cursor:pointer;
+  }
+
+  .emoji{font-size:34px;text-align:center;margin-bottom:8px;}
+</style>
+</head>
+<body>
+
+<div class="machine">
+  <div class="fascia">
+    <span>💳 PYTHON•ATM</span>
+    <span class="status"><span class="dot-online"></span>ONLINE</span>
+  </div>
+
+  <div class="screen" id="screen">
+    <div class="scanlines"></div>
+    <div class="status-line mono" id="statusLine">&gt; Insert card to begin — enter your 4-digit PIN.<span class="cursor">▌</span></div>
+    <div id="stageContent"></div>
+  </div>
+
+  <div class="footer-note mono">Demo PIN 2007 · Rs.5000 starting balance · In-memory session only</div>
+</div>
+
+<div class="overlay hidden" id="receiptOverlay">
+  <div class="slip">
+    <div class="slip-paper">
+      <div class="slip-title">★ TRANSACTION SLIP ★</div>
+      <div class="slip-sub" id="slipDate"></div>
+      <div class="slip-divider"></div>
+      <div id="slipLines"></div>
+      <div class="slip-divider"></div>
+      <div class="slip-approved">✔ APPROVED</div>
+    </div>
+    <button class="slip-btn mono" onclick="dismissReceipt()">Tear off & continue</button>
+  </div>
+</div>
+
+<script>
+const START_BALANCE = 5000;
+const START_PIN = "2007";
+
+let account = { pin: START_PIN, balance: START_BALANCE, transactions: [] };
+let stage = "pin";
+let pinInput = "";
+let attempts = 3;
+let amountInput = "";
+let oldPinInput = "";
+let newPinInput = "";
+
+const statusLine = document.getElementById("statusLine");
+const screenEl = document.getElementById("screen");
+const stageContent = document.getElementById("stageContent");
+
+function setMsg(text, type){
+  const color = type === "error" ? "var(--pink)" : "var(--teal)";
+  statusLine.style.color = color;
+  statusLine.innerHTML = "&gt; " + text + '<span class="cursor">▌</span>';
+  if(type === "error"){
+    screenEl.classList.remove("shake");
+    void screenEl.offsetWidth;
+    screenEl.classList.add("shake");
+  }
+}
+
+function resetEntryFields(){
+  pinInput = ""; amountInput = ""; oldPinInput = ""; newPinInput = "";
+}
+
+function keypadHTML(idPrefix){
+  const keys = ["1","2","3","4","5","6","7","8","9","C","0","⌫"];
+  return '<div class="keypad">' + keys.map(k=>{
+    let cls = "key";
+    if(k==="C") cls += " clear";
+    if(k==="⌫") cls += " back";
+    return `<button class="${cls}" onclick="${idPrefix}('${k}')">${k}</button>`;
+  }).join("") + "</div>";
+}
+
+function dotsHTML(count, color){
+  let html = '<div class="dots">';
+  for(let i=0;i<4;i++){
+    html += `<div class="pindot ${i<count ? 'filled '+ (color||'') : ''}"></div>`;
+  }
+  return html + "</div>";
+}
+
+/* ---------- PIN stage ---------- */
+function pinKey(k){
+  if(k === "C"){ pinInput=""; render(); return; }
+  if(k === "⌫"){ pinInput = pinInput.slice(0,-1); render(); return; }
+  if(pinInput.length >= 4) return;
+  pinInput += k;
+  render();
+  if(pinInput.length === 4){
+    setTimeout(verifyPin, 150);
+  }
+}
+
+function verifyPin(){
+  if(pinInput === account.pin){
+    setMsg("PIN verified successfully!", "success");
+    attempts = 3;
+    setTimeout(()=>{
+      stage = "menu"; pinInput = "";
+      setMsg("Choose a transaction.", "info");
+      render();
+    }, 450);
+  } else {
+    attempts -= 1;
+    pinInput = "";
+    if(attempts <= 0){
+      stage = "blocked";
+      setMsg("Account blocked! Contact bank.", "error");
+      render();
+    } else {
+      setMsg(`Wrong PIN. Attempts left: ${attempts}`, "error");
+      render();
+    }
+  }
+}
+
+/* ---------- Menu ---------- */
+function goMenu(){
+  resetEntryFields();
+  stage = "menu";
+  setMsg("Choose a transaction.", "info");
+  render();
+}
+
+function openBalance(){ stage="balance"; setMsg(`Your current balance: Rs.${account.balance}`, "info"); render(); }
+function openWithdraw(){ stage="withdraw"; setMsg("Enter amount to withdraw.", "info"); render(); }
+function openDeposit(){ stage="deposit"; setMsg("Enter amount to deposit.", "info"); render(); }
+function openStatement(){ stage="statement"; setMsg("Here's your mini statement.", "info"); render(); }
+function openChangePin(){ stage="changepin1"; setMsg("Enter your old PIN.", "info"); render(); }
+function openExit(){ stage="exit"; setMsg("Thank you for using ATM. Visit again!", "success"); render(); }
+
+/* ---------- Withdraw / Deposit ---------- */
+function amtKey(k){
+  if(k === "C"){ amountInput = ""; }
+  else if(k === "⌫"){ amountInput = amountInput.slice(0,-1); }
+  else { amountInput = (amountInput === "0" ? "" : amountInput) + k; }
+  render();
+}
+
+function doWithdraw(){
+  const amount = parseInt(amountInput || "0", 10);
+  if(!amount || amount <= 0){ setMsg("Enter a valid amount.", "error"); render(); return; }
+  if(amount > account.balance){ setMsg("Insufficient balance!", "error"); render(); return; }
+  if(amount % 100 !== 0){ setMsg("Amount should be in multiples of 100.", "error"); render(); return; }
+  account.balance -= amount;
+  account.transactions.push(`Withdrew Rs.${amount}`);
+  setMsg(`Withdrawal successful! Remaining balance: Rs.${account.balance}`, "success");
+  showReceipt([
+    {label:"Type", value:"WITHDRAWAL"},
+    {label:"Amount", value:`Rs.${amount}`},
+    {label:"Balance", value:`Rs.${account.balance}`},
+  ]);
+  amountInput = "";
+}
+
+function doDeposit(){
+  const amount = parseInt(amountInput || "0", 10);
+  if(!amount || amount <= 0){ setMsg("Enter a valid amount.", "error"); render(); return; }
+  account.balance += amount;
+  account.transactions.push(`Deposited Rs.${amount}`);
+  setMsg(`Deposit successful! New balance: Rs.${account.balance}`, "success");
+  showReceipt([
+    {label:"Type", value:"DEPOSIT"},
+    {label:"Amount", value:`Rs.${amount}`},
+    {label:"Balance", value:`Rs.${account.balance}`},
+  ]);
+  amountInput = "";
+}
+
+function pickAmount(v){ amountInput = String(v); render(); }
+
+/* ---------- Change PIN ---------- */
+function oldPinKey(k){
+  if(k === "C"){ oldPinInput=""; render(); return; }
+  if(k === "⌫"){ oldPinInput = oldPinInput.slice(0,-1); render(); return; }
+  if(oldPinInput.length >= 4) return;
+  oldPinInput += k;
+  render();
+  if(oldPinInput.length === 4){
+    setTimeout(()=>{
+      if(oldPinInput === account.pin){
+        stage = "changepin2";
+        setMsg("Enter your new 4-digit PIN.", "info");
+      } else {
+        setMsg("Old PIN incorrect.", "error");
+        oldPinInput = "";
+      }
+      render();
+    }, 150);
+  }
+}
+
+function newPinKey(k){
+  if(k === "C"){ newPinInput=""; render(); return; }
+  if(k === "⌫"){ newPinInput = newPinInput.slice(0,-1); render(); return; }
+  if(newPinInput.length >= 4) return;
+  newPinInput += k;
+  render();
+  if(newPinInput.length === 4){
+    setTimeout(()=>{
+      account.pin = newPinInput;
+      setMsg("PIN changed successfully!", "success");
+      resetEntryFields();
+      stage = "menu";
+      render();
+    }, 150);
+  }
+}
+
+/* ---------- Receipt ---------- */
+function showReceipt(lines){
+  document.getElementById("slipDate").textContent = "PYTHON ATM · " + new Date().toLocaleString();
+  document.getElementById("slipLines").innerHTML = lines.map(l =>
+    `<div class="slip-line"><span>${l.label}</span><span style="font-weight:700">${l.value}</span></div>`
+  ).join("");
+  document.getElementById("receiptOverlay").classList.remove("hidden");
+}
+function dismissReceipt(){
+  document.getElementById("receiptOverlay").classList.add("hidden");
+  goMenu();
+}
+
+/* ---------- Restart ---------- */
+function restart(){
+  account = { pin: START_PIN, balance: START_BALANCE, transactions: [] };
+  attempts = 3;
+  resetEntryFields();
+  stage = "pin";
+  setMsg("Insert card to begin — enter your 4-digit PIN.", "info");
+  render();
+}
+
+/* ---------- Render ---------- */
+function render(){
+  let html = "";
+
+  if(stage === "pin"){
+    html += `
+      <div style="text-align:center;color:var(--teal);margin-bottom:4px;">🛡️ <span class="mono" style="font-size:14px;">Enter PIN</span></div>
+      ${dotsHTML(pinInput.length)}
+      ${keypadHTML("pinKey")}
+    `;
+  }
+
+  else if(stage === "blocked"){
+    html += `
+      <div style="text-align:center;padding:24px 0;">
+        <div class="emoji">⛔</div>
+        <div class="mono" style="color:var(--pink);font-size:14px;">Account Blocked</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;">Contact your bank to unlock.</div>
+      </div>
+    `;
+  }
+
+  else if(stage === "menu"){
+    const items = [
+      {icon:"💰", title:"Check Balance", sub:"View available funds", color:"var(--teal)", fn:"openBalance"},
+      {icon:"💵", title:"Withdraw Money", sub:"Multiples of Rs.100", color:"var(--gold)", fn:"openWithdraw"},
+      {icon:"🐷", title:"Deposit Money", sub:"Add funds to account", color:"var(--teal)", fn:"openDeposit"},
+      {icon:"🧾", title:"Mini Statement", sub:"Recent transactions", color:"var(--gold)", fn:"openStatement"},
+      {icon:"🔑", title:"Change PIN", sub:"Update security PIN", color:"var(--pink)", fn:"openChangePin"},
+      {icon:"🚪", title:"Exit", sub:"End this session", color:"var(--muted)", fn:"openExit"},
+    ];
+    html += items.map(it => `
+      <div class="menu-btn" onclick="${it.fn}()">
+        <div class="menu-icon" style="background:${it.color}22;color:${it.color}">${it.icon}</div>
+        <div class="menu-text"><div class="title">${it.title}</div><div class="sub">${it.sub}</div></div>
+        <div class="menu-glow" style="background:${it.color};box-shadow:0 0 8px ${it.color}"></div>
+      </div>
+    `).join("");
+  }
+
+  else if(stage === "balance"){
+    html += `
+      <button class="back-bar" onclick="goMenu()">← Menu</button>
+      <div class="balance-box">
+        <div class="balance-label">Available Balance</div>
+        <div class="balance-value">Rs.${account.balance}</div>
+      </div>
+    `;
+  }
+
+  else if(stage === "withdraw"){
+    html += `
+      <button class="back-bar" onclick="goMenu()">← Menu</button>
+      <div class="chips">
+        ${[100,500,1000,2000,5000].map(v=>`<div class="chip" onclick="pickAmount(${v})">Rs.${v}</div>`).join("")}
+      </div>
+      <div class="amount-display" style="color:var(--gold)">Rs.${amountInput || "0"}</div>
+      ${keypadHTML("amtKey")}
+      <button class="action-btn" style="background:var(--gold);color:#2A1900" onclick="doWithdraw()">Withdraw</button>
+    `;
+  }
+
+  else if(stage === "deposit"){
+    html += `
+      <button class="back-bar" onclick="goMenu()">← Menu</button>
+      <div class="chips">
+        ${[100,500,1000,2000,5000].map(v=>`<div class="chip" onclick="pickAmount(${v})">Rs.${v}</div>`).join("")}
+      </div>
+      <div class="amount-display" style="color:var(--teal)">Rs.${amountInput || "0"}</div>
+      ${keypadHTML("amtKey")}
+      <button class="action-btn" style="background:var(--teal);color:#04211c" onclick="doDeposit()">Deposit</button>
+    `;
+  }
+
+  else if(stage === "statement"){
+    html += `<button class="back-bar" onclick="goMenu()">← Menu</button>`;
+    if(account.transactions.length === 0){
+      html += `<div style="text-align:center;font-size:13px;color:var(--muted);padding:32px 0;">No transactions yet.</div>`;
+    } else {
+      html += `<div class="tx-list">` + [...account.transactions].reverse().map(t=>{
+        const isW = t.startsWith("Withdrew");
+        const color = isW ? "var(--pink)" : "var(--teal)";
+        return `<div class="tx-item mono" style="border:1px solid ${color}33">
+          <span>${t}</span><span style="color:${color}">${isW ? "−" : "+"}</span>
+        </div>`;
+      }).join("") + `</div>`;
+    }
+  }
+
+  else if(stage === "changepin1"){
+    html += `
+      <button class="back-bar" onclick="goMenu()">← Menu</button>
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:4px;">Old PIN</div>
+      ${dotsHTML(oldPinInput.length, "pink")}
+      ${keypadHTML("oldPinKey")}
+    `;
+  }
+
+  else if(stage === "changepin2"){
+    html += `
+      <button class="back-bar" onclick="goMenu()">← Menu</button>
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:4px;">New PIN</div>
+      ${dotsHTML(newPinInput.length, "pink")}
+      ${keypadHTML("newPinKey")}
+    `;
+  }
+
+  else if(stage === "exit"){
+    html += `
+      <div style="text-align:center;padding:30px 0;">
+        <div class="emoji">👋</div>
+        <div style="font-size:14px;margin-bottom:18px;">Session ended.</div>
+        <button class="action-btn" style="max-width:200px;background:var(--teal);color:#04211c" onclick="restart()">Start New Session</button>
+      </div>
+    `;
+  }
+
+  stageContent.innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>
